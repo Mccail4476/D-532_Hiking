@@ -2,6 +2,8 @@
 import streamlit as st 
 import webbrowser
 import sqlite3
+import pandas as pd
+import matplotlib.pyplot as plt
 #from user import User
 
 st.set_page_config(page_title="PMGR", page_icon="🚀" )     
@@ -65,9 +67,26 @@ c.execute("select app_name from pwd_mgr")
 app_names = c.fetchall()
 app_names = [i[0] for i in app_names]
 
-radio_option = st.sidebar.radio("Menu", options=["Home", "Add Account", "Update Password", "Delete Account"])
+radio_option = st.sidebar.radio("Menu", options=["Hiking", "Account Database", "Add Account", "Update Password", "Delete Account"])
 
-if radio_option=="Home":    
+if radio_option=="Hiking":
+    st.subheader("Hiking Data")  
+    st.markdown("#####")  
+    hiking_df = pd.read_csv("trails-data.csv")
+    
+    st.title("Overall Trails Data")
+    st.write(hiking_df)
+
+    fig, ax = plt.subplots()
+    hiking_df. hist(
+        bins = 10,
+        column = "length",
+        figsize =(10,10),
+        ax=ax)
+    st.write(fig)
+
+
+if radio_option=="Account Database":    
     st.subheader("Find Credential 🔎")  
     st.markdown("#####")  
     if db_size>0:                   
