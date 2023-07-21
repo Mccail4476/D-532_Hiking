@@ -29,6 +29,151 @@ st.title(":green[RouteRanger - A Trail Finder App]")
 menu = ["Home", "Search", "Update Trails", "Remove Trails"]
 choice = st.sidebar.selectbox("Menu",menu)
 
+###
+
+## Parks Table & dataset ##
+
+#Read master dataset
+df = pd.read_csv('trails-data.csv')
+#Create parks DataFrame
+parks = df[['national_park']]
+#Drop duplicates
+parks = parks.drop_duplicates()
+#Create a column that ranges from 1 to the maximum row
+parks['park_id'] = range(1, len(parks)+1)
+#Rename columns
+parks = parks.rename(columns={'national_park':'parkName', 'park_id':'parkID'})
+try:
+    c.execute('DROP TABLE NationalParks;')
+except:
+    print("Nothing Happened")
+c.execute('CREATE TABLE NationalParks (\
+    parkName VARCHAR(100),\
+    parkID INT PRIMARY KEY NOT NULL);')
+parks.to_sql('NationalParks', conn, if_exists='append', index=False)
+
+## Trails table & dataset
+trails = df[['trail_id', 'name', 'national_park', 'length', 'elevation_gain',
+       'difficulty_rating', 'route_type', 'num_reviews']]
+trails = trails.rename(columns={'trail_id':'trailID', 'name':'trailName', 'national_park':'parkName', 'elevation_gain':'elevation_feet', 'difficulty_rating':'difficulty', 'route_type':'routeType', 'num_reviews':'reviews'})
+trails = pd.merge(trails, parks, on='parkName')
+trails.drop('parkName', axis=1, inplace=True)
+trails['trailID'].duplicated().any()
+try:
+    c.execute('DROP TABLE Trails;')
+except:
+    print("Nothing Happened")
+c.execute('CREATE TABLE Trails (\
+    trailID INT PRIMARY KEY NOT NULL,\
+    trailName VARCHAR(50) NOT NULL,\
+    elevation_feet DECIMAL(10,4),\
+    length DECIMAL(10,4),\
+    difficulty INT,\
+    routeType VARCHAR(20),\
+    reviews INT,\
+    parkID INT);')
+trails.to_sql('Trails', conn, if_exists='append', index=False)
+
+## Features Table & dataset ##
+
+features = df[['trail_id', 'features']]
+def format_text(text):
+    text = text[1:-1].split(', ')
+    new_string = [t.replace("'","") for t in text]
+    return new_string
+features['feature_list'] = features['features'].apply(format_text)
+features.drop('features', axis=1, inplace=True)
+new_rows = []
+for _, row in features.iterrows():
+    feature_list = row['feature_list']
+    for feature in feature_list:
+        new_rows.append([row['trail_id'], feature])
+
+new_feature = pd.DataFrame(new_rows, columns=['trail_id', 'feature'])
+new_feature.head()
+new_feature.rename(columns={'trail_id':'trailID'}, inplace=True)
+try:
+    c.execute('DROP TABLE Features;')
+except:
+    print("Nothing Happened")
+c.execute('CREATE TABLE Features (\
+    trailID INT, \
+    feature VARCHAR(200),\
+    FOREIGN KEY (trailID) REFERENCES Trails (trailID) ON DELETE CASCADE);')
+new_feature.to_sql('Features', conn, if_exists='append', index=False)
+
+## Activities dataset ##
+activities = df[['trail_id', 'activities']]
+activities['activity_list'] = activities['activities'].apply(format_text)
+activities.drop('activities', axis=1, inplace=True)
+new_rows = []
+for _, row in activities.iterrows():
+    activity_list = row['activity_list']
+    for activity in activity_list:
+        new_rows.append([row['trail_id'], activity])
+
+new_activities = pd.DataFrame(new_rows, columns=['trail_id', 'activity'])
+new_activities.head()
+new_activities.rename(columns={'trail_id':'trailID'}, inplace=True)
+try:
+    c.execute('DROP TABLE Activities;')
+except:
+    print("Nothing Happened")
+c.execute('CREATE TABLE Activities (\
+    trailID INT, \
+    activity VARCHAR(200),\
+    FOREIGN KEY (trailID) REFERENCES Trails (trailID) ON DELETE CASCADE);')
+new_activities.to_sql('Activities', conn, if_exists='append', index=False)
+
+
+## Location dataset ##
+
+loc = df[['trail_id', 'city_name', 'state_name', '_geoloc']].rename(columns={'trail_id':'trailID', 'city_name':'area_name','state_name':'state', '_geoloc':'geolocation'})
+try:
+    c.execute('DROP TABLE Location;')
+except:
+    print("Nothing Happened")
+c.execute('CREATE TABLE Location (\
+    trailID INT, \
+    area_name VARCHAR(100),\
+    state varchar(50),\
+    geolocation varchar(100),\
+    FOREIGN KEY (trailID) REFERENCES Trails (trailID) ON DELETE CASCADE);')
+loc.to_sql('Location', conn, if_exists='append', index=False)
+
+## Users Table
+try:
+    c.execute('DROP TABLE Users;')
+except:
+    print("Nothing Happened")
+c.execute('CREATE TABLE Users (userID INTEGER PRIMARY KEY AUTOINCREMENT,\
+    username VARCHAR(100),\
+    uPassword VARCHAR(100));')
+
+
+## TrailsUpdates Table ##
+
+try:
+    c.execute('DROP TABLE TrailsUpdates;')
+except:
+    print("Nothing Happened")
+c.execute('CREATE TABLE TrailsUpdates (\
+    updateID INTEGER PRIMARY KEY AUTOINCREMENT,\
+    trailID INT,\
+    userID INT,\
+    content TEXT,\
+    FOREIGN KEY (trailID) REFERENCES Trails (trailID),\
+    FOREIGN KEY (userID) REFERENCES Users (userID));')
+
+
+
+
+
+
+
+
+###
+
 if choice == "Home":
     st.subheader("About Us 🏞️")
 
@@ -42,7 +187,7 @@ if choice == "Home":
                 individuals who share your love for the great outdoors.""")
     
     st.subheader("All Trails Overview 🏕️")
-    all = 'SELECT trailName, parkName, elevation_feet, length, difficulty, routeType, reviews FROM Trails t JOIN NationalParks p ON t.parkID=p.parkID LIMIT 5'
+    all = 'SELECT trailName, parkName, elevation_feet, length, difficulty, routeType, reviews FROM Trails t JOIN NationalParks p ON t.parkID=p.parkID LIMIT 10'
     display = pd.read_sql_query(all, con=conn)
     st.dataframe(display, column_config={'trailName':'Trail', 'parkName':'National Park',
                                          'length': st.column_config.NumberColumn('Length',format="%.2f mi"),
@@ -124,9 +269,40 @@ elif choice=="Search":
         result = pd.read_sql_query(get_trail, con=conn)
         st.write(result)
 
+
+###  update new_data so it includes the remaining columns.  find a way to update.
 if choice == "Update Trails":
-    st.subheader("See something wrong?")
+    st.subheader("Select trail to update")
+    df = pd.read_csv('trails-data.csv')
+    st.write(df)
+
+
+    st.write("Add new trail details!")    
+    name_input = st.text_input('Trail name?')
+    national_park_input = st.text_input('national_park name?')
+    city_name_input = st.text_input('city_name name?')
     
+    if st.button('Update!'):
+        new_data = {'name' : name_input, 'national_park' : national_park_input, 'city_name' : city_name_input}
+    
+        df_updated = df.append([new_data], ignore_index = True)
+        st.write(df_updated)
+        
+
+
+###  Input parameters to search to make it easier to find somethign to delete
 if choice == "Remove Trails":
     st.subheader("Know a trail that is no longer available?")
-    
+
+    df = pd.read_csv('trails-data.csv')
+    st.write(df)
+
+
+
+    trail_id_removal = st.number_input('Input trail_id for removal')
+    if st.button('Delete!'):
+        df = df[df.trail_id != trail_id_removal]
+        st.write(df)
+
+
+        
