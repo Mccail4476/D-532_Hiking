@@ -26,7 +26,7 @@ st.sidebar.image("https://i.imgur.com/7VEtlCP.jpg", use_column_width=True)
 
 st.title(":green[RouteRanger - A Trail Finder App]")
 
-menu = ["Home", "Search", "Update Trails", "Remove Trails"]
+menu = ["Home", "Search", "Add Trails", "Update Trails", "Remove Trails"]
 choice = st.sidebar.selectbox("Menu",menu)
 
 ###
@@ -268,6 +268,47 @@ elif choice=="Search":
             st.write(n_trails, 'total trails with difficulty level of', level)
         result = pd.read_sql_query(get_trail, con=conn)
         st.write(result)
+
+
+if choice == 'Add Trails':
+    st.subheader('Add a new trail')
+    id = []
+    for i in c.execute('SELECT trailID FROM Trails'):
+        id.append(i[0])
+    id.sort()
+    new_trail_id = id[-1]+1
+    
+    new_trail_name = st.text_input("Enter trail name")
+    new_elevation = st.text_input("Enter trail elevation in feet (number only)")
+    new_length = st.text_input("Enter trail length in mile (number only)")
+    new_difficulty = st.selectbox("Select difficulty (1 to 5, where 5 is the most difficult)", [1,2,3,4,5])
+    
+    park_menu = []
+    new_parkID=''
+    for p in c.execute('SELECT DISTINCT parkName FROM NationalParks'):
+        park_menu.append(p[0])
+    park_choice = st.selectbox("Select national park", park_menu)
+    for i in c.execute('SELECT parkID FROM NationalParks WHERE parkName=?', (park_choice,)):
+        new_parkID=i[0]
+    
+    new_route_type = st.selectbox("Select route type", ['out and back', 'loop', 'point to point'])
+    
+    if st.button('Add'):
+        c.execute('SELECT trailName FROM Trails WHERE trailName=?', (new_trail_name,))
+        result=c.fetchone()
+        if result is not None:
+            st.write('This trail already exists. Please use "search" to find this trail')
+        else:
+            insert_query='INSERT INTO Trails(trailID, trailName, length, elevation_feet, difficulty, \
+            routeType, parkID) VALUES (?,?,?,?,?,?,?)'
+            c.execute(insert_query,(new_trail_id, new_trail_name, new_length, new_elevation, new_difficulty, 
+                                    new_route_type, new_parkID))
+            conn.commit()
+            st.write('Thanks! This trail is added to our database')
+            new_trail = 'SELECT trailName, parkName, elevation_feet, length, difficulty, routeType FROM Trails t JOIN NationalParks p ON t.parkID=p.parkID WHERE \
+                trailName="{}"'.format(new_trail_name)
+            display = pd.read_sql_query(new_trail, con=conn)
+            st.write(display)
 
 
 ###  update new_data so it includes the remaining columns.  find a way to update.
