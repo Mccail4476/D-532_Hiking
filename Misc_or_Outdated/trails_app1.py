@@ -335,28 +335,20 @@ if choice == "Update Trails":
 if choice == "Remove Trails":
     st.subheader("Know a trail that is no longer available?")
 
-    count = 0 
+    # df = pd.read_csv('trails-data.csv')
+    # st.write(df)
+    ##
+    output = 'CREATE VIEW trail_set AS SELECT trailName, elevation_feet, length, difficulty, routeType FROM Trails t JOIN NationalParks p ON t.parkID=p.parkID WHERE trailName LIKE "%{}%"'
+    result = pd.read_sql_query(output, con=conn)
+    result['trail_id'] = result['trail_id'].str.replace(",","")
+    st.write(result)
 
-    trail_id_removal = st.text_input('Input trailID for removal')
+    ##
+    trail_id_removal = st.text_input('Input trail_id for removal')
     if st.button('Delete!'):
-        delete_trail = f"""DELETE FROM Trails WHERE trailID={trail_id_removal}"""
-        c.execute(delete_trail)
-        conn.commit()
-        output = 'SELECT trailID, trailName, elevation_feet, length, difficulty, routeType FROM Trails t JOIN NationalParks p ON t.parkID=p.parkID'
-
-        result = pd.read_sql_query(output, con=conn)
-        result['trailID'] = result['trailID'].astype('str').str.replace(",","")
+        delete_trail = 'DELETE FROM trail_set WHERE trail_id=?', (trail_id_removal,)
+        result = pd.read_sql_query(get_trail, con=conn)
         st.write(result)
-        count = count + 1
 
 
-    output = 'SELECT trailID, trailName, elevation_feet, length, difficulty, routeType FROM Trails t JOIN NationalParks p ON t.parkID=p.parkID'
-
-    result = pd.read_sql_query(output, con=conn) 
-
-    result['trailID'] = result['trailID'].astype('str').str.replace(",","")
-    if count == 0:
-        st.write(result)
-    else:
-        st.write("Row Deleted!")
-
+        
