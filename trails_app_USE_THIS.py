@@ -330,8 +330,6 @@ if choice == "Update Trails":
         st.write(df_updated)
         
 
-
-###  Input parameters to search to make it easier to find somethign to delete
 if choice == "Remove Trails":
     st.subheader("Know a trail that is no longer available?")
 
